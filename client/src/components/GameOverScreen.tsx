@@ -112,7 +112,7 @@ export default function GameOverScreen({
         <button
           onClick={handleSaveScore}
           disabled={!playerName.trim() || addEntry.isPending}
-          className="w-full mt-3 bg-medical-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+          className="btn-primary w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
         >
           {addEntry.isPending ? "Enregistrement..." : "Enregistrer mon score"}
         </button>
