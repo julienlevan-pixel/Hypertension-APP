@@ -2,9 +2,9 @@ import { useState, useMemo } from "react";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 
 type CompletionScreenProps = {
-  gameState: any;
-  onRestart: () => void;
-  onShowLeaderboard: () => void;
+  gameState?: any;
+  onRestart?: () => void;
+  onShowLeaderboard?: () => void;
 };
 
 export default function CompletionScreen({
@@ -12,26 +12,37 @@ export default function CompletionScreen({
   onRestart,
   onShowLeaderboard,
 }: CompletionScreenProps) {
+  // Callbacks "safe" (au cas où le parent ne les passe pas)
+  const safeRestart = typeof onRestart === "function" ? onRestart : () => {};
+  const safeShowLb = typeof onShowLeaderboard === "function" ? onShowLeaderboard : () => {};
+
+  // DEBUG: voir ce que le parent envoie (ouvre F12 > Console quand tu termines le quiz)
+  console.debug("CompletionScreen props", {
+    gameState,
+    score: gameState?.score,
+    answered: gameState?.questionsAnswered ?? gameState?.answersCount,
+    correct: gameState?.correctAnswers ?? gameState?.correct,
+    level: gameState?.currentLevel ?? gameState?.level,
+    totalTime: gameState?.totalTime,
+  });
+
   const [playerName, setPlayerName] = useState("");
   const [saved, setSaved] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const { addEntry } = useLeaderboard();
 
-  // Valeurs "safe" (pas de crash si gameState partiel)
-  const answered = Number(
-    gameState?.questionsAnswered ?? gameState?.answersCount ?? 0
-  );
-  const correct = Number(gameState?.correctAnswers ?? gameState?.correct ?? 0);
-  const score = Number(gameState?.score ?? 0);
-  const level = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
-  const totalTime = Number(gameState?.totalTime ?? 240);
+  // Valeurs "safe"
+  const answered = Number(gameState?.questionsAnswered ?? gameState?.answersCount ?? 0);
+  const correct  = Number(gameState?.correctAnswers   ?? gameState?.correct       ?? 0);
+  const score    = Number(gameState?.score ?? 0);
+  const level    = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
+  const totalTime = Number.isFinite(Number(gameState?.totalTime)) ? Number(gameState?.totalTime) : 240;
 
   const percentRaw = answered > 0 ? (correct / answered) * 100 : 0;
 
   const percentLabel = useMemo(
-    () =>
-      new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 2 }).format(
-        percentRaw
-      ) + " %",
+    () => new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 2 }).format(percentRaw) + " %",
     [percentRaw]
   );
 
@@ -40,6 +51,7 @@ export default function CompletionScreen({
     [totalTime, answered]
   );
 
+  // Règle d’éligibilité (mais n’empêche plus l’affichage du panneau)
   const isEligible = score > 0 && answered > 0;
 
   const formatTime = (seconds: number) => {
@@ -50,16 +62,27 @@ export default function CompletionScreen({
   };
 
   const handleSaveScore = () => {
+    setErrorMsg(null);
     const name = playerName.trim();
-    if (!name) return;
+    if (!name) {
+      setErrorMsg("Veuillez entrer un nom.");
+      return;
+    }
+    // Même si pas éligible, on bloque via disabled — mais on garde la logique ici aussi:
+    if (!isEligible) {
+      setErrorMsg("Score non éligible (pas de réponses/score nul).");
+      return;
+    }
 
     addEntry.mutate(
+      { name: name.slice(0, 40), score, percent: percentRaw }, // percent = 0..100
       {
-        name: name.slice(0, 40),
-        score,
-        percent: percentRaw, // 0..100
-      },
-      { onSuccess: () => setSaved(true), onError: (e: any) => console.error(e) }
+        onSuccess: () => setSaved(true),
+        onError: (e: any) => {
+          console.error("Save error:", e);
+          setErrorMsg(e?.message || "Erreur d’enregistrement.");
+        },
+      }
     );
   };
 
@@ -77,6 +100,7 @@ export default function CompletionScreen({
         </p>
       </div>
 
+      {/* Carte récap */}
       <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
         <div className="text-center mb-6">
           <div className="text-5xl font-bold text-success-green mb-2">
@@ -111,11 +135,13 @@ export default function CompletionScreen({
         </div>
       </div>
 
-      {!saved && isEligible && (
+      {/* ✅ Toujours affiché : panneau d’enregistrement (bouton désactivé si pas éligible) */}
+      {!saved && (
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
             Enregistrer votre score
           </h3>
+
           <div className="max-w-md mx-auto">
             <input
               type="text"
@@ -124,13 +150,22 @@ export default function CompletionScreen({
               onChange={(e) => setPlayerName(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-medical-blue"
             />
+
+            {errorMsg && <p className="text-red-600 text-sm mt-2">{errorMsg}</p>}
+
             <button
               onClick={handleSaveScore}
-              disabled={!playerName.trim() || addEntry.isPending}
+              disabled={!playerName.trim() || !isEligible || addEntry.isPending}
               className="btn-primary w-full mt-3 bg-medical-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
             >
               {addEntry.isPending ? "Enregistrement..." : "Enregistrer dans le Classement"}
             </button>
+
+            {!isEligible && (
+              <p className="text-xs text-gray-500 mt-2">
+                (Le bouton s’activera si vous avez au moins 1 réponse et un score &gt; 0)
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -138,18 +173,24 @@ export default function CompletionScreen({
       {saved && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-8 text-center">
           <p className="text-success-green font-semibold">Score enregistré avec succès !</p>
+          <button
+            onClick={safeShowLb}
+            className="mt-3 btn-primary bg-medical-blue hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg"
+          >
+            Voir le Classement
+          </button>
         </div>
       )}
 
       <div className="text-center space-y-3">
         <button
-          onClick={onRestart}
+          onClick={safeRestart}
           className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors mr-4"
         >
           Nouveau Quiz
         </button>
         <button
-          onClick={onShowLeaderboard}
+          onClick={safeShowLb}
           className="btn-primary bg-medical-blue hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
         >
           Voir le Classement
