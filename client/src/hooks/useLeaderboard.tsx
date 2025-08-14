@@ -1,59 +1,37 @@
-import { useState, useEffect } from "react";
-import type { LeaderboardEntry, InsertLeaderboardEntry } from "@shared/schema";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-const STORAGE_KEY = 'hta-leaderboard';
+export type LeaderboardEntry = {
+  name: string;
+  score: number;
+  percent: number;   // 0–100
+  date: number;      // timestamp ms
+};
 
 export function useLeaderboard() {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const qc = useQueryClient();
 
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setLeaderboard(JSON.parse(stored));
-      } catch (error) {
-        console.error('Error parsing leaderboard data:', error);
-        setLeaderboard([]);
-      }
-    }
-  }, []);
+  const query = useQuery({
+    queryKey: ["leaderboard"],
+    queryFn: async (): Promise<LeaderboardEntry[]> => {
+      const r = await fetch("/api/leaderboard", { cache: "no-store" });
+      if (!r.ok) throw new Error("Failed to load leaderboard");
+      return (await r.json()) as LeaderboardEntry[];
+    },
+    staleTime: 0,
+  });
 
-  const saveScore = (entry: InsertLeaderboardEntry) => {
-    const newEntry: LeaderboardEntry = {
-      ...entry,
-      id: crypto.randomUUID(),
-    };
+  const addEntry = useMutation({
+    mutationFn: async (entry: Omit<LeaderboardEntry, "date">) => {
+      const r = await fetch("/api/leaderboard", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(entry),
+      });
+      if (!r.ok) throw new Error("Failed to save entry");
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["leaderboard"] }),
+  });
 
-    setLeaderboard(prev => {
-      // Remove any existing entry for the same player if it's not completed
-      const filteredPrev = prev.filter(existing => 
-        existing.name !== entry.name || existing.isCompleted
-      );
-      
-      const updated = [...filteredPrev, newEntry]
-        .sort((a, b) => {
-          // Sort by completion status first (completed games first), then by score
-          if (a.isCompleted !== b.isCompleted) {
-            return a.isCompleted ? -1 : 1;
-          }
-          return b.score - a.score || a.time - b.time;
-        })
-        .slice(0, 10); // Keep only top 10
-      
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const isScoreEligibleForLeaderboard = (score: number) => {
-    if (leaderboard.length < 10) return true;
-    const lowestScore = leaderboard[leaderboard.length - 1]?.score || 0;
-    return score > lowestScore;
-  };
-
-  return {
-    leaderboard,
-    saveScore,
-    isScoreEligibleForLeaderboard,
-  };
+  return { entries: query.data ?? [], isLoading: query.isLoading, error: query.error, addEntry };
 }
