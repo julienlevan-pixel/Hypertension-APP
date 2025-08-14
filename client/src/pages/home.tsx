@@ -1,3 +1,4 @@
+// client/src/pages/home.tsx
 import { useState } from "react";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import GameInterface from "@/components/GameInterface";
@@ -10,24 +11,47 @@ export default function Home() {
   const { gameState, actions } = useGameState();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
+  // ✅ Wrappers sûrs (évite "r is not a function" si une action est absente un court instant)
+  const handleStart = () => {
+    try { actions?.startGame?.(); } catch (e) { console.error(e); }
+  };
+  const handleRestart = () => {
+    try { actions?.resetGame?.(); } catch (e) { console.error(e); }
+  };
+  const handleShowLeaderboard = () => setShowLeaderboard(true);
+  const handleCloseLeaderboard = () => setShowLeaderboard(false);
+
   const renderCurrentScreen = () => {
     if (gameState.isGameOver) {
-      return <GameOverScreen gameState={gameState} onRestart={actions.resetGame} onShowLeaderboard={() => setShowLeaderboard(true)} />;
+      return (
+        <GameOverScreen
+          gameState={gameState}
+          onRestart={handleRestart}
+          onShowLeaderboard={handleShowLeaderboard}
+        />
+      );
     }
-    
+
     if (gameState.isCompleted) {
-      return <CompletionScreen 
-        gameState={gameState} 
-        onRestart={actions.resetGame} 
-        onShowLeaderboard={() => setShowLeaderboard(true)} 
-      />;
+      return (
+        <CompletionScreen
+          gameState={gameState}
+          onRestart={handleRestart}
+          onShowLeaderboard={handleShowLeaderboard}
+        />
+      );
     }
-    
+
     if (gameState.isPlaying) {
       return <GameInterface gameState={gameState} actions={actions} />;
     }
-    
-    return <WelcomeScreen onStart={actions.startGame} onShowLeaderboard={() => setShowLeaderboard(true)} />;
+
+    return (
+      <WelcomeScreen
+        onStart={handleStart}
+        onShowLeaderboard={handleShowLeaderboard}
+      />
+    );
   };
 
   return (
@@ -51,8 +75,8 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <button 
-                onClick={() => setShowLeaderboard(true)}
+              <button
+                onClick={handleShowLeaderboard}
                 className="text-gray-600 hover:text-medical-blue transition-colors"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -67,7 +91,7 @@ export default function Home() {
       {renderCurrentScreen()}
 
       {showLeaderboard && (
-        <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
+        <LeaderboardModal onClose={handleCloseLeaderboard} />
       )}
     </div>
   );
