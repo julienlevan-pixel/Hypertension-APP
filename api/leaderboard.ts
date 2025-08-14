@@ -1,39 +1,72 @@
 // api/leaderboard.ts
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Redis } from "@upstash/redis";
 
 type Entry = {
   name: string;
-  score: number;   // total points
+  score: number;   // points
   percent: number; // 0..100
   date?: number;   // timestamp ms
 };
 
-// ⚠️ Nécessite UPSTASH_REDIS_REST_URL et UPSTASH_REDIS_REST_TOKEN dans Vercel → Settings → Environment Variables
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+// Supporte Upstash classique OU Vercel KV
+const URL_FROM_ENV =
+  process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+const TOKEN_FROM_ENV =
+  process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 
-export default async function handler(req: any, res: any) {
+const kvReady = Boolean(URL_FROM_ENV && TOKEN_FROM_ENV);
+const redis = kvReady
+  ? new Redis({ url: URL_FROM_ENV as string, token: TOKEN_FROM_ENV as string })
+  : null;
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("cache-control", "no-store");
 
+  // Debug léger: /api/leaderboard?debug=1 pour vérifier les ENV
+  if (req.method === "GET" && req.query?.debug === "1") {
+    return res.status(200).json({
+      kvReady,
+      hasUrl: Boolean(URL_FROM_ENV),
+      hasToken: Boolean(TOKEN_FROM_ENV),
+      // on ne renvoie PAS les valeurs pour des raisons de sécu
+    });
+  }
+
   if (req.method === "GET") {
-    const items = await redis.lrange<string>("hta-leaderboard", 0, -1);
-    const parsed: Entry[] = items.map((s: string) => JSON.parse(s));
-    // tri: score décroissant puis plus récent
-    parsed.sort((a, b) => b.score - a.score || (b.date ?? 0) - (a.date ?? 0));
-    res.setHeader("content-type", "application/json");
-    res.status(200).send(JSON.stringify(parsed.slice(0, 100)));
-    return;
+    if (!kvReady) {
+      // Pas de KV dispo => on retourne une liste vide (gracieux)
+      return res.status(200).json([]);
+    }
+    try {
+      const items = await redis!.lrange<string>("hta-leaderboard", 0, -1);
+      const parsed: Entry[] = items.map((s: string) => JSON.parse(s));
+      // tri: score desc, puis date plus récente
+      parsed.sort((a, b) => b.score - a.score || (b.date ?? 0) - (a.date ?? 0));
+      return res.status(200).json(parsed.slice(0, 100));
+    } catch (e: any) {
+      return res.status(502).json({ error: "Upstash read error", message: e?.message });
+    }
   }
 
   if (req.method === "POST") {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body ?? {});
-    const { name, score, percent } = body as Partial<Entry>;
+    if (!kvReady) {
+      return res.status(503).send("Leaderboard disabled: missing KV env (URL/TOKEN).");
+    }
 
+    let body: any = req.body;
+    // Certains environnements ne parsèrent pas auto le JSON
+    if (!body || typeof body !== "object") {
+      try {
+        body = JSON.parse((req as any).body || "{}");
+      } catch {
+        body = {};
+      }
+    }
+
+    const { name, score, percent } = body as Partial<Entry>;
     if (typeof name !== "string" || typeof score !== "number" || typeof percent !== "number") {
-      res.status(400).send("Bad Request");
-      return;
+      return res.status(400).json({ error: "Bad Request: name(string), score(number), percent(number) expected." });
     }
 
     const entry: Entry = {
@@ -43,13 +76,15 @@ export default async function handler(req: any, res: any) {
       date: Date.now(),
     };
 
-    await redis.lpush("hta-leaderboard", JSON.stringify(entry));
-    await redis.ltrim("hta-leaderboard", 0, 999); // garde les 1000 plus récents
-
-    res.setHeader("content-type", "application/json");
-    res.status(200).send(JSON.stringify({ ok: true }));
-    return;
+    try {
+      await redis!.lpush("hta-leaderboard", JSON.stringify(entry));
+      await redis!.ltrim("hta-leaderboard", 0, 999); // garde 1000 max
+      return res.status(200).json({ ok: true });
+    } catch (e: any) {
+      return res.status(502).json({ error: "Upstash write error", message: e?.message });
+    }
   }
 
-  res.status(405).send("Method Not Allowed");
+  res.setHeader("allow", "GET, POST");
+  return res.status(405).send("Method Not Allowed");
 }
