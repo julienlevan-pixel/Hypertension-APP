@@ -1,0 +1,236 @@
+## 📋 **Instructions finales optimisées pour Replit - Application HTA (MVP)**
+
+### **🎯 Objectif du projet :**
+
+- Créer une application Web éducative pour étudiants en médecine et pharmacie au Québec
+- Enseigner la matière complète sur l’hypertension artérielle
+- Utiliser la taxonomie de Bloom pour structurer l’apprentissage
+
+### **📚 Contenu académique à couvrir :**
+
+- **Épidémiologie** de l’hypertension
+- **Physiopathologie** et mécanismes
+- **Présentation clinique** et symptômes
+- **Diagnostic** et techniques de mesure
+- **Stratification du risque cardiovasculaire** (Framingham)
+- **Objectifs thérapeutiques** selon les lignes directrices
+- **Modifications des habitudes de vie** (MHV)
+- **Pharmacologie** des antihypertenseurs
+- **Pharmacothérapie** et algorithmes de traitement
+- **Suivi** et monitoring des patients
+
+### **📖 Sources de référence (pour futures questions réelles) :**
+
+- **Lignes directrices Hypertension Canada 2025**
+- **Société québécoise d’hypertension artérielle (SQHA)**
+- **INESSS** (protocoles médicaux nationaux)
+- **Manuels de pharmacologie** (DiPiro, Therapeutic Choices, Koda-Kimble)
+
+### **🎮 Structure pédagogique - 4 niveaux de Bloom :**
+
+1. **Niveau 1 - Connaissance** : Mémorisation de faits, définitions, données
+1. **Niveau 2 - Compréhension** : Interprétation des mécanismes et concepts
+1. **Niveau 3 - Application** : Calculs, sélection thérapeutique, cas pratiques
+1. **Niveau 4 - Analyse** : Cas complexes, diagnostic différentiel, interactions
+
+### **⚡ Mécaniques de jeu (CRITIQUES) :**
+
+- **5 questions correctes** par niveau pour progresser au suivant
+- **Maximum 3 erreurs** tolérées **au total** sur l’ensemble du jeu
+- **Maximum 2 erreurs consécutives** permises (sinon échec immédiat)
+- **Échec = retour au niveau 1** (recommencer complètement)
+- **Questions aléatoires** tirées d’une banque de 10 questions par niveau
+- **Timer par question** : démarre au clic “Commencer”, s’arrête à la soumission
+- **Feedback immédiat** après chaque réponse
+
+### **🏆 Système de gamification :**
+
+- **Leaderboard** public avec classement des joueurs
+- **Score basé sur la vitesse** : plus la réponse est rapide, plus le score est élevé
+- **Calcul du score par question** :
+  
+  ```javascript
+  const calculateScore = (isCorrect, timeInSeconds) => {
+    const basePoints = isCorrect ? 100 : 0;
+    const maxTime = 30; // secondes max pour réponse
+    const speedBonus = Math.max(0, 50 * (1 - timeInSeconds / maxTime));
+    return basePoints + Math.round(speedBonus);
+  };
+  ```
+- **Score total** = Somme des scores individuels + bonus de complétion
+- **Affichage temps réel** du score par question
+
+### **💻 Stack technique pour Replit :**
+
+- **Frontend** : React.js avec hooks (useState, useEffect, useRef)
+- **Styling** : Tailwind CSS pour interface responsive
+- **Import CSV** : Fonction native JavaScript ou Papa Parse si nécessaire
+- **Timer** : useEffect avec setInterval/Date.now() pour précision
+- **Stockage** : LocalStorage pour sauvegarder leaderboard et progression
+- **Déploiement** : Replit hosting intégré
+
+### **📁 Structure des fichiers Replit :**
+
+```
+/src
+  /components
+    - QuestionCard.jsx        // Composant question individuelle
+    - Leaderboard.jsx         // Tableau des scores
+    - ProgressBar.jsx         // Barre de progression niveaux
+    - Timer.jsx               // Chronomètre en temps réel
+    - GameOverScreen.jsx      // Écran d'échec
+    - CompletionScreen.jsx    // Écran de réussite
+  /data
+    - questions.csv           // Banque de 40 questions MVP
+  /utils
+    - csvParser.js            // Fonction d'import CSV
+    - scoreCalculator.js      // Logique calcul scores
+    - gameLogic.js            // Règles du jeu (erreurs, progression)
+  /styles
+    - tailwind.css           // Configuration Tailwind
+  - App.jsx                  // Composant principal
+  - index.js                 // Point d'entrée
+  - package.json             // Dépendances React
+```
+
+### **📋 Format CSV exact (40 questions MVP) :**
+
+```csv
+niveau,domaine,question,optionA,optionB,optionC,optionD,reponse_correcte,explication,reference
+1,Épidémiologie,Q1,A,B,C,D,A,Explication Q1,Ref1
+1,Physiopathologie,Q2,A,B,C,D,B,Explication Q2,Ref2
+1,Diagnostic,Q3,A,B,C,D,C,Explication Q3,Ref3
+1,Pharmacologie,Q4,A,B,C,D,D,Explication Q4,Ref4
+1,Stratification,Q5,A,B,C,D,A,Explication Q5,Ref5
+1,Objectifs,Q6,A,B,C,D,B,Explication Q6,Ref6
+1,MHV,Q7,A,B,C,D,C,Explication Q7,Ref7
+1,Pharmacothérapie,Q8,A,B,C,D,D,Explication Q8,Ref8
+1,Présentation,Q9,A,B,C,D,A,Explication Q9,Ref9
+1,Suivi,Q10,A,B,C,D,B,Explication Q10,Ref10
+2,Épidémiologie,Q11,A,B,C,D,C,Explication Q11,Ref11
+[...répéter pour niveaux 2, 3, 4 avec Q12-Q40]
+```
+
+### **🔧 Fonctionnalités critiques à implémenter :**
+
+#### **1. Gestion du timer :**
+
+```javascript
+const [startTime, setStartTime] = useState(null);
+const [responseTime, setResponseTime] = useState(0);
+
+// Démarrer timer à l'affichage de la question
+useEffect(() => {
+  setStartTime(Date.now());
+}, [currentQuestion]);
+
+// Calculer temps à la soumission
+const handleSubmit = () => {
+  const endTime = Date.now();
+  const timeInSeconds = (endTime - startTime) / 1000;
+  setResponseTime(timeInSeconds);
+  // Calculer et afficher score
+};
+```
+
+#### **2. Validation stricte des erreurs :**
+
+```javascript
+const [totalErrors, setTotalErrors] = useState(0);
+const [consecutiveErrors, setConsecutiveErrors] = useState(0);
+
+const handleWrongAnswer = () => {
+  const newTotalErrors = totalErrors + 1;
+  const newConsecutiveErrors = consecutiveErrors + 1;
+  
+  // Échec immédiat si 3 erreurs total OU 2 consécutives
+  if (newTotalErrors >= 3 || newConsecutiveErrors >= 2) {
+    setGameState('gameOver');
+    return;
+  }
+  
+  setTotalErrors(newTotalErrors);
+  setConsecutiveErrors(newConsecutiveErrors);
+};
+```
+
+#### **3. Import et randomisation CSV :**
+
+```javascript
+const loadQuestions = async () => {
+  const response = await fetch('/src/data/questions.csv');
+  const csvText = await response.text();
+  const questions = parseCSV(csvText);
+  
+  // Randomiser questions par niveau
+  const randomizedQuestions = {};
+  [1,2,3,4].forEach(level => {
+    const levelQuestions = questions.filter(q => q.niveau == level);
+    randomizedQuestions[level] = shuffleArray(levelQuestions);
+  });
+  
+  return randomizedQuestions;
+};
+```
+
+#### **4. Leaderboard LocalStorage :**
+
+```javascript
+const saveScore = (playerName, totalScore, totalTime, level) => {
+  const scores = JSON.parse(localStorage.getItem('hta-leaderboard') || '[]');
+  scores.push({
+    name: playerName,
+    score: totalScore,
+    time: totalTime,
+    level: level,
+    date: new Date().toISOString()
+  });
+  
+  // Trier par score décroissant, puis temps croissant
+  scores.sort((a, b) => b.score - a.score || a.time - b.time);
+  
+  // Garder top 10
+  const top10 = scores.slice(0, 10);
+  localStorage.setItem('hta-leaderboard', JSON.stringify(top10));
+};
+```
+
+### **🎯 Interface utilisateur requise :**
+
+- **Page d’accueil** : Règles du jeu + bouton démarrer
+- **Interface de jeu** : Question, options, timer, score courant, progression
+- **Feedback immédiat** : Correct/Incorrect avec explication
+- **Écran Game Over** : Statistiques + bouton recommencer
+- **Écran de réussite** : Score final + leaderboard
+- **Leaderboard permanent** : Top 10 des meilleurs scores
+
+### **📱 Responsive Design :**
+
+- **Desktop** : Interface complète avec sidebar leaderboard
+- **Tablet** : Interface adaptée, leaderboard en modal
+- **Mobile** : Interface simplifiée, navigation verticale
+
+### **🚀 Livrables MVP attendus :**
+
+- **Application React fonctionnelle** sur Replit
+- **Fichier CSV** avec 40 questions placeholder (Q1-Q40)
+- **Système de scoring** avec bonus vitesse
+- **Leaderboard** sauvegardé localement
+- **Import CSV** automatique et randomisation
+- **Interface responsive** complète
+- **Documentation** README avec instructions utilisation
+
+### **✅ Critères de validation :**
+
+- **Mécaniques de jeu strictes** : 3 erreurs total ET 2 consécutives
+- **Timer précis** : Mesure exacte du temps de réponse
+- **Progression fluide** : 4 niveaux avec 5 questions chacun
+- **Gamification** : Score temps réel + leaderboard motivant
+- **Import CSV** : Modification facile des questions
+- **Performance** : Application fluide sans lag
+
+### **🔗 URL de test :**
+
+L’application doit être **accessible publiquement** via l’URL Replit pour tests utilisateurs.
+
+**Ces instructions sont maintenant 100% prêtes pour un développeur Replit !** 🚀​​​​​​​​​​​​​​​​
