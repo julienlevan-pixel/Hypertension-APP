@@ -46,8 +46,8 @@ export default function Home() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">HTA Quiz</h1>
-                <p className="text-xs text-gray-500">Formation Médicale Interactive</p>
+                <h1 className="text-xl font-bold text-gray-900">Hypertension Quiz</h1>
+                <p className="text-xs text-gray-500">Par : Julien, UdeM</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
