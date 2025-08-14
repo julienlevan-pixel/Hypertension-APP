@@ -1,47 +1,43 @@
 import { useLeaderboard } from "@/hooks/useLeaderboard";
-// Icône PNG (si alias @ actif). Sinon, utilise un chemin relatif ex: "../assets/leaderboard.png"
+// Si alias '@' OK :
 import leaderboardIcon from "@/assets/leaderboard.png";
+// Sinon chemin relatif (ex) :
+// import leaderboardIcon from "../assets/leaderboard.png";
 
 interface LeaderboardModalProps {
   onClose: () => void;
 }
 
 export default function LeaderboardModal({ onClose }: LeaderboardModalProps) {
-  const { leaderboard } = useLeaderboard();
+  const { entries } = useLeaderboard();
 
-  // Date sûre : accepte string ISO ou timestamp
   const formatDate = (dateInput: string | number) => {
     const d = typeof dateInput === "number" ? new Date(dateInput) : new Date(dateInput);
-    return d.toLocaleDateString("fr-CA", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    return d.toLocaleDateString("fr-CA", { day: "numeric", month: "long", year: "numeric" });
   };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const s = Number.isFinite(seconds) ? seconds : 0;
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // Score uniforme (évite les différences d'appareil)
   const formatScore = (n: number) =>
     new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 0 }).format(n);
 
-  // Pourcentage avec 2 décimales max (supporte 0–1 ou 0–100)
   const formatPercent = (p: number) => {
-    const raw = Number(p);
-    const val = raw <= 1 ? raw * 100 : raw; // si accuracy est 0–1
+    const val = p <= 1 ? p * 100 : p; // support 0–1 ou 0–100
     return new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 2 }).format(val) + " %";
   };
 
-  // ✅ TOP 10 : tri par score décroissant, puis accuracy, puis date la plus récente
-  const top = [...leaderboard]
-    .sort((a, b) =>
-      (b.score ?? 0) - (a.score ?? 0) ||
-      Number(b.accuracy ?? 0) - Number(a.accuracy ?? 0) ||
-      (new Date(b.date as any).getTime() - new Date(a.date as any).getTime())
+  // TOP 10 : tri score desc, puis percent desc, puis date récente
+  const top = [...entries]
+    .sort(
+      (a, b) =>
+        (b.score ?? 0) - (a.score ?? 0) ||
+        (Number(b.percent ?? 0) - Number(a.percent ?? 0)) ||
+        ((b.date ?? 0) - (a.date ?? 0))
     )
     .slice(0, 10);
 
@@ -50,18 +46,10 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps) {
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-2xl font-bold text-gray-900 flex items-center">
-            <img
-              src={leaderboardIcon}
-              alt="Classement"
-              className="w-6 h-6 mr-3 inline-block align-middle"
-            />
+            <img src={leaderboardIcon} alt="Classement" className="w-6 h-6 mr-3 inline-block align-middle" />
             Classement
           </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-            aria-label="Fermer"
-          >
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Fermer">
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
@@ -74,12 +62,7 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps) {
 
         {top.length === 0 ? (
           <div className="text-center py-8">
-            <img
-              src={leaderboardIcon}
-              alt=""
-              aria-hidden
-              className="w-12 h-12 opacity-40 mx-auto mb-4"
-            />
+            <img src={leaderboardIcon} alt="" aria-hidden className="w-12 h-12 opacity-40 mx-auto mb-4" />
             <p className="text-gray-600">Aucun score enregistré pour le moment.</p>
             <p className="text-sm text-gray-500 mt-2">Soyez le premier à terminer le quiz !</p>
           </div>
@@ -94,6 +77,12 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps) {
                   : index === 2
                   ? "bg-orange-50 border-orange-200"
                   : "bg-white border-gray-200";
+
+              // champs optionnels tolérés (isCompleted/time/level peuvent ne pas exister)
+              const showTime = typeof (entry as any).time === "number";
+              const isCompleted = Boolean((entry as any).isCompleted);
+              const level = (entry as any).level;
+              const correctInLevel = (entry as any).correctAnswersInLevel;
 
               return (
                 <div
@@ -117,22 +106,25 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps) {
                     <div>
                       <div className="flex items-center space-x-2">
                         <span className="font-semibold text-gray-900">{entry.name}</span>
-                        {entry.isCompleted ? (
-                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                            ✓ Terminé
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
-                            ⏳ En cours
-                          </span>
+
+                        {typeof (entry as any).isCompleted !== "undefined" && (
+                          isCompleted ? (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                              ✓ Terminé
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
+                              ⏳ En cours
+                            </span>
+                          )
                         )}
                       </div>
+
                       <div className="text-sm text-gray-600">
-                        {formatDate(entry.date as any)} • {formatTime(entry.time)}
-                        {!entry.isCompleted && entry.correctAnswersInLevel !== undefined && (
-                          <span className="ml-2">
-                            • Niveau {entry.level} ({entry.correctAnswersInLevel}/5)
-                          </span>
+                        {formatDate(entry.date)}
+                        {showTime && <> • {formatTime((entry as any).time)}</>}
+                        {typeof correctInLevel !== "undefined" && typeof level !== "undefined" && (
+                          <span className="ml-2">• Niveau {level} ({correctInLevel}/5)</span>
                         )}
                       </div>
                     </div>
@@ -152,7 +144,7 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps) {
                     >
                       {formatScore(entry.score)}
                     </div>
-                    <div className="text-sm text-gray-600">{formatPercent(entry.accuracy)}</div>
+                    <div className="text-sm text-gray-600">{formatPercent(entry.percent)}</div>
                   </div>
                 </div>
               );
@@ -172,3 +164,4 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps) {
     </div>
   );
 }
+
