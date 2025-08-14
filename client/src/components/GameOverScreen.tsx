@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 type Props = {
   gameState?: any;
@@ -11,17 +11,39 @@ export default function GameOverScreen({
   onRestart,
   onShowLeaderboard,
 }: Props) {
-  // Wrappers sûrs : on ne JAMAIS appelle la prop directement
-  const safeRestart = () => {
-    if (typeof onRestart === "function") onRestart();
-    else console.warn("[GameOverScreen] onRestart n'est pas une fonction");
-  };
-  const safeShowLb = () => {
-    if (typeof onShowLeaderboard === "function") onShowLeaderboard();
-    else console.warn("[GameOverScreen] onShowLeaderboard n'est pas une fonction");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const safeRestart = () => typeof onRestart === "function" && onRestart();
+  const safeShowLb = () => typeof onShowLeaderboard === "function" && onShowLeaderboard();
+
+  const handleSaveScore = async () => {
+    const playerName = prompt("Entrez votre nom pour le classement :", "");
+    if (!playerName) return;
+
+    setSaving(true);
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: playerName,
+          score: gameState?.score ?? 0,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Erreur serveur (${res.status})`);
+      setMessage("Score enregistré avec succès !");
+    } catch (err) {
+      console.error(err);
+      setMessage("Impossible d'enregistrer le score.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Valeurs "safe" (évite tout crash si le state est partiel)
   const score = Number(gameState?.score ?? 0);
   const level = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
 
@@ -34,24 +56,29 @@ export default function GameOverScreen({
       </div>
       <h2 className="text-4xl font-bold text-gray-900 mb-2">Fin de la partie</h2>
       <p className="text-gray-600 mb-6">
-        Score : <span className="font-semibold">{new Intl.NumberFormat("fr-CA").format(score)}</span> •
-        Niveau atteint : <span className="font-semibold">{level}</span>
+        Score : <span className="font-semibold">{score}</span> • Niveau atteint : <span className="font-semibold">{level}</span>
       </p>
 
-      <div className="space-x-3">
-        <button
-          onClick={safeRestart}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors"
-        >
+      <div className="space-x-3 mb-4">
+        <button onClick={safeRestart} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg">
           Recommencer
         </button>
-        <button
-          onClick={safeShowLb}
-          className="btn-primary bg-medical-blue hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
-        >
+        <button onClick={safeShowLb} className="bg-medical-blue text-white font-semibold py-3 px-6 rounded-lg">
           Voir le Classement
         </button>
       </div>
+
+      <div className="mb-4">
+        <button
+          onClick={handleSaveScore}
+          disabled={saving}
+          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50"
+        >
+          {saving ? "Enregistrement..." : "Enregistrer mon score"}
+        </button>
+      </div>
+
+      {message && <p className="text-sm text-gray-700">{message}</p>}
     </div>
   );
 }
