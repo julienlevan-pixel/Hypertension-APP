@@ -1,12 +1,11 @@
 import { useState, useMemo } from "react";
-import type { GameState } from "@shared/schema";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 
-interface CompletionScreenProps {
-  gameState: GameState;
+type CompletionScreenProps = {
+  gameState: any;                 // on tolère la forme du state pour éviter un crash
   onRestart: () => void;
   onShowLeaderboard: () => void;
-}
+};
 
 export default function CompletionScreen({
   gameState,
@@ -16,34 +15,44 @@ export default function CompletionScreen({
   const [playerName, setPlayerName] = useState("");
   const [saved, setSaved] = useState(false);
 
-  // ⬇️ Nouveau hook (version API): addEntry pour POST /api/leaderboard
+  // Hook API leaderboard (GET/POST /api/leaderboard)
   const { addEntry } = useLeaderboard();
 
-  // ——— Statistiques calculées ———
-  const totalTime = 240; // TODO: remplace par ton vrai temps total si tu l'as
-  const accuracyRaw =
-    gameState.questionsAnswered > 0
-      ? (gameState.correctAnswers / gameState.questionsAnswered) * 100
-      : 0;
+  // ---- Lecture "safe" du state (valeurs par défaut) ----
+  const answered = Number(
+    gameState?.questionsAnswered ??
+      gameState?.answersCount ??
+      0
+  );
 
-  const accuracyLabel = useMemo(
+  const correct = Number(
+    gameState?.correctAnswers ??
+      gameState?.correct ??
+      0
+  );
+
+  const score = Number(gameState?.score ?? 0);
+  const level = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
+
+  // Si tu as un temps total dans le state, prends-le; sinon 240s par défaut.
+  const totalTime = Number(gameState?.totalTime ?? 240);
+
+  const percentRaw = answered > 0 ? (correct / answered) * 100 : 0;
+
+  const percentLabel = useMemo(
     () =>
       new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 2 }).format(
-        accuracyRaw
+        percentRaw
       ) + " %",
-    [accuracyRaw]
+    [percentRaw]
   );
 
   const averageTime = useMemo(
-    () =>
-      gameState.questionsAnswered > 0
-        ? totalTime / gameState.questionsAnswered
-        : 0,
-    [totalTime, gameState.questionsAnswered]
+    () => (answered > 0 ? totalTime / answered : 0),
+    [totalTime, answered]
   );
 
-  // Autorise l'enregistrement si on a un score > 0 et des questions répondues
-  const isEligible = gameState.score > 0 && gameState.questionsAnswered > 0;
+  const isEligible = score > 0 && answered > 0;
 
   const formatTime = (seconds: number) => {
     const s = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
@@ -52,22 +61,18 @@ export default function CompletionScreen({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // ——— Enregistrement manuel au clic ———
+  // ---- Enregistrement manuel au clic ----
   const handleSaveScore = () => {
     const name = playerName.trim();
     if (!name) return;
 
-    // On envoie percent (0..100) au backend; la date est ajoutée côté serveur.
     addEntry.mutate(
       {
         name: name.slice(0, 40),
-        score: gameState.score,
-        percent: accuracyRaw, // ex: 87.5
+        score,                 // points
+        percent: percentRaw,   // 0..100
       },
-      {
-        onSuccess: () => setSaved(true),
-        // (optionnel) onError: (e) => console.error(e),
-      }
+      { onSuccess: () => setSaved(true) }
     );
   };
 
@@ -81,17 +86,15 @@ export default function CompletionScreen({
         </div>
         <h2 className="text-4xl font-bold text-gray-900 mb-4">Félicitations !</h2>
         <p className="text-lg text-gray-600 mb-6">
-          Vous avez terminé avec succès tous les niveaux du quiz HTA. Très Fort !
+          Vous avez terminé le quiz HTA. Excellent travail !
         </p>
       </div>
 
-      {/* Final Score Card */}
+      {/* Carte récap */}
       <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
         <div className="text-center mb-6">
           <div className="text-5xl font-bold text-success-green mb-2">
-            {new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 0 }).format(
-              gameState.score
-            )}
+            {new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 0 }).format(score)}
           </div>
           <div className="text-lg text-gray-600">Score Total</div>
         </div>
@@ -105,7 +108,7 @@ export default function CompletionScreen({
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-success-green">
-              {accuracyLabel}
+              {percentLabel}
             </div>
             <div className="text-sm text-gray-600">Précision</div>
           </div>
@@ -116,15 +119,13 @@ export default function CompletionScreen({
             <div className="text-sm text-gray-600">Temps moyen</div>
           </div>
           <div className="text-center p-4 bg-purple-50 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600">
-              {gameState.currentLevel}
-            </div>
+            <div className="text-2xl font-bold text-purple-600">{level}</div>
             <div className="text-sm text-gray-600">Niveau atteint</div>
           </div>
         </div>
       </div>
 
-      {/* Saisie + bouton d'enregistrement (manuel) */}
+      {/* Saisie + bouton (enregistrement manuel) */}
       {!saved && isEligible && (
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
@@ -165,9 +166,7 @@ export default function CompletionScreen({
               clipRule="evenodd"
             />
           </svg>
-          <p className="text-success-green font-semibold">
-            Score enregistré avec succès !
-          </p>
+          <p className="text-success-green font-semibold">Score enregistré avec succès !</p>
         </div>
       )}
 
