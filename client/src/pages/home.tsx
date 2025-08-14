@@ -1,3 +1,4 @@
+// client/src/pages/home.tsx
 import { useState } from "react";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import GameInterface from "@/components/GameInterface";
@@ -10,24 +11,50 @@ export default function Home() {
   const { gameState, actions } = useGameState();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
+  // ✅ Wrappers sûrs (ne JAMAIS passer la référence brute si elle peut être undefined)
+  const handleStart = () => {
+    if (typeof actions?.startGame === "function") actions.startGame();
+    else console.warn("actions.startGame n'est pas prêt");
+  };
+  const handleRestart = () => {
+    if (typeof actions?.resetGame === "function") actions.resetGame();
+    else console.warn("actions.resetGame n'est pas prêt");
+  };
+  const handleShowLeaderboard = () => setShowLeaderboard(true);
+  const handleCloseLeaderboard = () => setShowLeaderboard(false);
+
   const renderCurrentScreen = () => {
-    if (gameState.isGameOver) {
-      return <GameOverScreen gameState={gameState} onRestart={actions.resetGame} onShowLeaderboard={() => setShowLeaderboard(true)} />;
+    // ⚠️ Toujours PASSER une fonction, pas appeler (pas de parenthèses)
+    if (gameState?.isGameOver) {
+      return (
+        <GameOverScreen
+          gameState={gameState}
+          onRestart={handleRestart}
+          onShowLeaderboard={handleShowLeaderboard}
+        />
+      );
     }
-    
-    if (gameState.isCompleted) {
-      return <CompletionScreen 
-        gameState={gameState} 
-        onRestart={actions.resetGame} 
-        onShowLeaderboard={() => setShowLeaderboard(true)} 
-      />;
+
+    if (gameState?.isCompleted) {
+      return (
+        <CompletionScreen
+          gameState={gameState}
+          onRestart={handleRestart}
+          onShowLeaderboard={handleShowLeaderboard}
+        />
+      );
     }
-    
-    if (gameState.isPlaying) {
+
+    if (gameState?.isPlaying) {
       return <GameInterface gameState={gameState} actions={actions} />;
     }
-    
-    return <WelcomeScreen onStart={actions.startGame} onShowLeaderboard={() => setShowLeaderboard(true)} />;
+
+    return (
+      <WelcomeScreen
+        onStart={handleStart}
+        onShowLeaderboard={handleShowLeaderboard}
+      />
+    );
   };
 
   return (
@@ -38,7 +65,6 @@ export default function Home() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
               <div className="bg-medical-blue text-white p-2 rounded-lg">
-                {/* Blood pressure monitor icon */}
                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2C8.69 2 6 4.69 6 8c0 .68.12 1.33.32 1.95L12 22l5.68-12.05c.2-.62.32-1.27.32-1.95C18 4.69 15.31 2 12 2z"/>
                   <circle cx="12" cy="8" r="2.5" fill="white"/>
@@ -51,9 +77,10 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <button 
-                onClick={() => setShowLeaderboard(true)}
+              <button
+                onClick={handleShowLeaderboard}
                 className="text-gray-600 hover:text-medical-blue transition-colors"
+                aria-label="Voir le classement"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -67,7 +94,7 @@ export default function Home() {
       {renderCurrentScreen()}
 
       {showLeaderboard && (
-        <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
+        <LeaderboardModal onClose={handleCloseLeaderboard} />
       )}
     </div>
   );
