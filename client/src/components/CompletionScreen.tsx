@@ -1,197 +1,120 @@
-import { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 
-type CompletionScreenProps = {
+type Props = {
   gameState?: any;
   onRestart?: () => void;
   onShowLeaderboard?: () => void;
 };
 
-export default function CompletionScreen({
+export default function GameOverScreen({
   gameState,
   onRestart,
   onShowLeaderboard,
-}: CompletionScreenProps) {
-  // Callbacks "safe" (au cas où le parent ne les passe pas)
-  const safeRestart = typeof onRestart === "function" ? onRestart : () => {};
-  const safeShowLb  = typeof onShowLeaderboard === "function" ? onShowLeaderboard : () => {};
+}: Props) {
+  // Callbacks sûrs
+  const safeRestart = () => typeof onRestart === "function" && onRestart();
+  const safeShowLb = () => typeof onShowLeaderboard === "function" && onShowLeaderboard();
 
-  // (debug utile)
-  console.debug("CompletionScreen props", {
-    gameState,
-    score: gameState?.score,
-    answered: gameState?.questionsAnswered ?? gameState?.answersCount,
-    correct: gameState?.correctAnswers ?? gameState?.correct,
-    level: gameState?.currentLevel ?? gameState?.level,
-    totalTime: gameState?.totalTime,
-  });
-
+  // State local
   const [playerName, setPlayerName] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Hook API (POST/GET /api/leaderboard)
   const { addEntry } = useLeaderboard();
 
   // Valeurs "safe"
-  const answered  = Number(gameState?.questionsAnswered ?? gameState?.answersCount ?? 0);
-  const correct   = Number(gameState?.correctAnswers   ?? gameState?.correct       ?? 0);
-  const score     = Number(gameState?.score ?? 0);
-  const level     = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
-  const totalTime = Number.isFinite(Number(gameState?.totalTime)) ? Number(gameState?.totalTime) : 240;
+  const score = Number(gameState?.score ?? 0);
+  const answered = Number(gameState?.questionsAnswered ?? gameState?.answersCount ?? 0);
+  const correct  = Number(gameState?.correctAnswers   ?? gameState?.correct       ?? 0);
+  const level    = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
 
-  const percentRaw = answered > 0 ? (correct / answered) * 100 : 0;
-
-  const percentLabel = useMemo(
-    () => new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 2 }).format(percentRaw) + " %",
-    [percentRaw]
-  );
-
-  const averageTime = useMemo(
-    () => (answered > 0 ? totalTime / answered : 0),
-    [totalTime, answered]
-  );
-
-  // Règle d’éligibilité (n’empêche pas l’affichage du panneau)
-  const isEligible = score > 0 && answered > 0;
-
-  const formatTime = (seconds: number) => {
-    const s = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
-    const mins = Math.floor(s / 60);
-    const secs = s % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+  const percent = answered > 0 ? (correct / answered) * 100 : 0; // 0..100
+  const percentLabel =
+    new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 2 }).format(percent) + " %";
 
   const handleSaveScore = () => {
+    setMessage(null);
     setErrorMsg(null);
+
     const name = playerName.trim();
     if (!name) {
       setErrorMsg("Veuillez entrer un nom.");
       return;
     }
-    if (!isEligible) {
-      setErrorMsg("Score non éligible (pas de réponses/score nul).");
+    if (score <= 0 || answered <= 0) {
+      setErrorMsg("Score non éligible (pas de réponses ou score nul).");
       return;
     }
+
+    // Envoi à l’API — IMPORTANT: inclure percent
     addEntry.mutate(
-      { name: name.slice(0, 40), score, percent: percentRaw }, // percent = 0..100
+      { name: name.slice(0, 40), score, percent },
       {
-        onSuccess: () => setSaved(true),
-        onError: (e: any) => {
-          console.error("Save error:", e);
-          setErrorMsg(e?.message || "Erreur d’enregistrement.");
-        },
+        onSuccess: () => setMessage("Score enregistré avec succès !"),
+        onError: (e: any) =>
+          setErrorMsg(e?.message || "Impossible d’enregistrer le score."),
       }
     );
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <div className="text-center mb-8">
-        <div className="w-24 h-24 bg-success-green rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <h2 className="text-4xl font-bold text-gray-900 mb-4">Félicitations !</h2>
-        <p className="text-lg text-gray-600 mb-6">
-          Vous avez terminé le quiz HTA. Excellent travail !
-        </p>
+    <div className="max-w-3xl mx-auto px-4 py-8 text-center">
+      <div className="w-24 h-24 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-6">
+        <svg className="w-12 h-12 text-white" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 5h2v6H9V5zm0 8h2v2H9v-2z" />
+        </svg>
       </div>
 
-      {/* Carte récap */}
-      <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
-        <div className="text-center mb-6">
-          <div className="text-5xl font-bold text-success-green mb-2">
-            {new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 0 }).format(score)}
-          </div>
-          <div className="text-lg text-gray-600">Score Total</div>
-        </div>
+      <h2 className="text-4xl font-bold text-gray-900 mb-2">Fin de la partie</h2>
+      <p className="text-gray-600 mb-2">
+        Score : <span className="font-semibold">{new Intl.NumberFormat("fr-CA").format(score)}</span>
+        {" • "}
+        Niveau atteint : <span className="font-semibold">{level}</span>
+      </p>
+      <p className="text-gray-500 mb-6">Précision : {percentLabel}</p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-medical-blue">
-              {formatTime(totalTime)}
-            </div>
-            <div className="text-sm text-gray-600">Temps total</div>
-          </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-success-green">
-              {percentLabel}
-            </div>
-            <div className="text-sm text-gray-600">Précision</div>
-          </div>
-          <div className="text-center p-4 bg-yellow-50 rounded-lg">
-            <div className="text-2xl font-bold text-warning-orange">
-              {averageTime.toFixed(1)}s
-            </div>
-            <div className="text-sm text-gray-600">Temps moyen</div>
-          </div>
-          <div className="text-center p-4 bg-purple-50 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600">{level}</div>
-            <div className="text-sm text-gray-600">Niveau atteint</div>
-          </div>
-        </div>
-      </div>
-
-      {/* ✅ Toujours affiché : panneau d’enregistrement */}
-      {!saved && (
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
-            Enregistrer votre score
-          </h3>
-
-          <div className="max-w-md mx-auto">
-            <input
-              type="text"
-              placeholder="Entrez votre nom ou pseudo"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-medical-blue"
-            />
-
-            {errorMsg && <p className="text-red-600 text-sm mt-2">{errorMsg}</p>}
-
-            <button
-              onClick={handleSaveScore}
-              disabled={!playerName.trim() || !isEligible || addEntry.isPending}
-              className="btn-primary w-full mt-3 bg-medical-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
-            >
-              {addEntry.isPending ? "Enregistrement..." : "Enregistrer dans le Classement"}
-            </button>
-
-            {!isEligible && (
-              <p className="text-xs text-gray-500 mt-2">
-                (Le bouton s’activera si vous avez au moins 1 réponse et un score &gt; 0)
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {saved && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-8 text-center">
-          <p className="text-success-green font-semibold">Score enregistré avec succès !</p>
-          <button
-            onClick={safeShowLb}
-            className="mt-3 btn-primary bg-medical-blue hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg"
-          >
-            Voir le Classement
-          </button>
-        </div>
-      )}
-
-      <div className="text-center space-y-3">
+      <div className="space-x-3 mb-6">
         <button
           onClick={safeRestart}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors mr-4"
+          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors"
         >
-          Nouveau Quiz
+          Recommencer
         </button>
+
+        {/* Lisibilité ++ : texte bleu sur fond blanc avec bordure */}
         <button
           onClick={safeShowLb}
-          className="btn-primary bg-medical-blue hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+          className="bg-white text-medical-blue border border-medical-blue hover:bg-medical-blue hover:text-white font-semibold py-3 px-6 rounded-lg transition-colors"
         >
           Voir le Classement
+        </button>
+      </div>
+
+      {/* Formulaire d'enregistrement */}
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-4 max-w-md mx-auto text-left">
+        <h3 className="text-lg font-semibold text-gray-900 mb-3 text-center">
+          Enregistrer mon score
+        </h3>
+        <label className="block text-sm text-gray-700 mb-1">Nom / Pseudo</label>
+        <input
+          type="text"
+          placeholder="Entrez votre nom"
+          value={playerName}
+          onChange={(e) => setPlayerName(e.target.value)}
+          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:border-medical-blue"
+        />
+
+        {errorMsg && <p className="text-red-600 text-sm mt-2">{errorMsg}</p>}
+        {message && <p className="text-green-700 text-sm mt-2">{message}</p>}
+
+        <button
+          onClick={handleSaveScore}
+          disabled={!playerName.trim() || addEntry.isPending}
+          className="w-full mt-3 bg-medical-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+        >
+          {addEntry.isPending ? "Enregistrement..." : "Enregistrer mon score"}
         </button>
       </div>
     </div>
