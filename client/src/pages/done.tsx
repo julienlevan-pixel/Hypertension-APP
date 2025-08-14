@@ -1,4 +1,4 @@
-import CompletionScreen from "@/pages/CompletionScreen";
+import CompletionScreen from "@/components/CompletionScreen";
 
 export default function DoneTest() {
   return (
