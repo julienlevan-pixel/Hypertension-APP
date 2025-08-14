@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 
 type CompletionScreenProps = {
-  gameState: any;                 // on tolère la forme du state pour éviter un crash
+  gameState: any;
   onRestart: () => void;
   onShowLeaderboard: () => void;
 };
@@ -14,27 +14,15 @@ export default function CompletionScreen({
 }: CompletionScreenProps) {
   const [playerName, setPlayerName] = useState("");
   const [saved, setSaved] = useState(false);
-
-  // Hook API leaderboard (GET/POST /api/leaderboard)
   const { addEntry } = useLeaderboard();
 
-  // ---- Lecture "safe" du state (valeurs par défaut) ----
+  // Valeurs "safe" (pas de crash si gameState partiel)
   const answered = Number(
-    gameState?.questionsAnswered ??
-      gameState?.answersCount ??
-      0
+    gameState?.questionsAnswered ?? gameState?.answersCount ?? 0
   );
-
-  const correct = Number(
-    gameState?.correctAnswers ??
-      gameState?.correct ??
-      0
-  );
-
+  const correct = Number(gameState?.correctAnswers ?? gameState?.correct ?? 0);
   const score = Number(gameState?.score ?? 0);
   const level = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
-
-  // Si tu as un temps total dans le state, prends-le; sinon 240s par défaut.
   const totalTime = Number(gameState?.totalTime ?? 240);
 
   const percentRaw = answered > 0 ? (correct / answered) * 100 : 0;
@@ -61,7 +49,6 @@ export default function CompletionScreen({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  // ---- Enregistrement manuel au clic ----
   const handleSaveScore = () => {
     const name = playerName.trim();
     if (!name) return;
@@ -69,10 +56,10 @@ export default function CompletionScreen({
     addEntry.mutate(
       {
         name: name.slice(0, 40),
-        score,                 // points
-        percent: percentRaw,   // 0..100
+        score,
+        percent: percentRaw, // 0..100
       },
-      { onSuccess: () => setSaved(true) }
+      { onSuccess: () => setSaved(true), onError: (e: any) => console.error(e) }
     );
   };
 
@@ -90,7 +77,6 @@ export default function CompletionScreen({
         </p>
       </div>
 
-      {/* Carte récap */}
       <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
         <div className="text-center mb-6">
           <div className="text-5xl font-bold text-success-green mb-2">
@@ -125,7 +111,6 @@ export default function CompletionScreen({
         </div>
       </div>
 
-      {/* Saisie + bouton (enregistrement manuel) */}
       {!saved && isEligible && (
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
@@ -144,13 +129,6 @@ export default function CompletionScreen({
               disabled={!playerName.trim() || addEntry.isPending}
               className="btn-primary w-full mt-3 bg-medical-blue hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors"
             >
-              <svg className="w-4 h-4 mr-2 inline" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
               {addEntry.isPending ? "Enregistrement..." : "Enregistrer dans le Classement"}
             </button>
           </div>
@@ -159,13 +137,6 @@ export default function CompletionScreen({
 
       {saved && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-8 text-center">
-          <svg className="w-6 h-6 text-success-green mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-              clipRule="evenodd"
-            />
-          </svg>
           <p className="text-success-green font-semibold">Score enregistré avec succès !</p>
         </div>
       )}
@@ -175,22 +146,12 @@ export default function CompletionScreen({
           onClick={onRestart}
           className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg transition-colors mr-4"
         >
-          <svg className="w-4 h-4 mr-2 inline" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-              clipRule="evenodd"
-            />
-          </svg>
           Nouveau Quiz
         </button>
         <button
           onClick={onShowLeaderboard}
           className="btn-primary bg-medical-blue hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
         >
-          <svg className="w-4 h-4 mr-2 inline" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
           Voir le Classement
         </button>
       </div>
