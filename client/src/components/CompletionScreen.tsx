@@ -14,9 +14,9 @@ export default function CompletionScreen({
 }: CompletionScreenProps) {
   // Callbacks "safe" (au cas où le parent ne les passe pas)
   const safeRestart = typeof onRestart === "function" ? onRestart : () => {};
-  const safeShowLb = typeof onShowLeaderboard === "function" ? onShowLeaderboard : () => {};
+  const safeShowLb  = typeof onShowLeaderboard === "function" ? onShowLeaderboard : () => {};
 
-  // DEBUG: voir ce que le parent envoie (ouvre F12 > Console quand tu termines le quiz)
+  // (debug utile)
   console.debug("CompletionScreen props", {
     gameState,
     score: gameState?.score,
@@ -33,10 +33,10 @@ export default function CompletionScreen({
   const { addEntry } = useLeaderboard();
 
   // Valeurs "safe"
-  const answered = Number(gameState?.questionsAnswered ?? gameState?.answersCount ?? 0);
-  const correct  = Number(gameState?.correctAnswers   ?? gameState?.correct       ?? 0);
-  const score    = Number(gameState?.score ?? 0);
-  const level    = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
+  const answered  = Number(gameState?.questionsAnswered ?? gameState?.answersCount ?? 0);
+  const correct   = Number(gameState?.correctAnswers   ?? gameState?.correct       ?? 0);
+  const score     = Number(gameState?.score ?? 0);
+  const level     = Number(gameState?.currentLevel ?? gameState?.level ?? 1);
   const totalTime = Number.isFinite(Number(gameState?.totalTime)) ? Number(gameState?.totalTime) : 240;
 
   const percentRaw = answered > 0 ? (correct / answered) * 100 : 0;
@@ -51,7 +51,7 @@ export default function CompletionScreen({
     [totalTime, answered]
   );
 
-  // Règle d’éligibilité (mais n’empêche plus l’affichage du panneau)
+  // Règle d’éligibilité (n’empêche pas l’affichage du panneau)
   const isEligible = score > 0 && answered > 0;
 
   const formatTime = (seconds: number) => {
@@ -68,12 +68,10 @@ export default function CompletionScreen({
       setErrorMsg("Veuillez entrer un nom.");
       return;
     }
-    // Même si pas éligible, on bloque via disabled — mais on garde la logique ici aussi:
     if (!isEligible) {
       setErrorMsg("Score non éligible (pas de réponses/score nul).");
       return;
     }
-
     addEntry.mutate(
       { name: name.slice(0, 40), score, percent: percentRaw }, // percent = 0..100
       {
@@ -135,7 +133,7 @@ export default function CompletionScreen({
         </div>
       </div>
 
-      {/* ✅ Toujours affiché : panneau d’enregistrement (bouton désactivé si pas éligible) */}
+      {/* ✅ Toujours affiché : panneau d’enregistrement */}
       {!saved && (
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
           <h3 className="text-xl font-semibold text-gray-900 mb-4 text-center">
