@@ -3,16 +3,16 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 export type LeaderboardEntry = {
   name: string;
   score: number;
-  percent: number;   // 0–100
-  date: number;      // timestamp ms
+  percent: number; // 0..100
+  date: number;    // timestamp ms
 };
 
 export function useLeaderboard() {
   const qc = useQueryClient();
 
-  const query = useQuery({
+  const query = useQuery<LeaderboardEntry[]>({
     queryKey: ["leaderboard"],
-    queryFn: async (): Promise<LeaderboardEntry[]> => {
+    queryFn: async () => {
       const r = await fetch("/api/leaderboard", { cache: "no-store" });
       if (!r.ok) throw new Error("Failed to load leaderboard");
       return (await r.json()) as LeaderboardEntry[];
@@ -33,5 +33,10 @@ export function useLeaderboard() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["leaderboard"] }),
   });
 
-  return { entries: query.data ?? [], isLoading: query.isLoading, error: query.error, addEntry };
+  return {
+    entries: query.data ?? [],
+    isLoading: query.isLoading,
+    error: query.error as Error | null,
+    addEntry,
+  };
 }
