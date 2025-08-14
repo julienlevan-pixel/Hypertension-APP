@@ -67,7 +67,7 @@ export default function GameOverScreen({
         </svg>
       </div>
 
-      <h2 className="text-4xl font-bold text-gray-900 mb-2">Fin de la partie</h2>
+      <h2 className="text-4xl font-bold text-gray-900 mb-2">BRAVO ! Très fort !</h2>
       <p className="text-gray-600 mb-2">
         Score : <span className="font-semibold">{new Intl.NumberFormat("fr-CA").format(score)}</span>
         {" • "}
